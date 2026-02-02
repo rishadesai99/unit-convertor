@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unit Converter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Unit Converter</h1>
+            <p>Convert between different units easily</p>
+        </header>
+
+        <div class="converter-wrapper">
+            <div class="category-selector">
+                <button class="category-btn active" data-category="length">Length</button>
+                <button class="category-btn" data-category="weight">Weight</button>
+                <button class="category-btn" data-category="volume">Volume</button>
+                <button class="category-btn" data-category="temperature">Temperature</button>
+            </div>
+
+            <div class="converter-container">
+                <div class="input-group">
+                    <label for="value">Value:</label>
+                    <input type="number" id="value" placeholder="Enter value" step="any">
+                </div>
+
+                <div class="units-group">
+                    <div class="unit-section">
+                        <label for="from_unit">From:</label>
+                        <select id="from_unit">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+
+                    <div class="swap-btn">
+                        <button id="swap-units" title="Swap units">⇄</button>
+                    </div>
+
+                    <div class="unit-section">
+                        <label for="to_unit">To:</label>
+                        <select id="to_unit">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+
+                <button id="convert-btn" class="convert-btn">Convert</button>
+
+                <div id="result-container" class="result-container hidden">
+                    <div class="result-box">
+                        <p class="result-label">Result:</p>
+                        <p class="result-value"><span id="result"></span> <span id="result-unit"></span></p>
+                    </div>
+                </div>
+
+                <div id="error-container" class="error-container hidden">
+                    <p id="error-message"></p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 Unit Converter | Made with Flask</p>
+        </footer>
+    </div>
+
+    <script>
+        const unitData = {
+            length: {
+                units: ['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi'],
+                labels: ['Millimeter', 'Centimeter', 'Meter', 'Kilometer', 'Inch', 'Foot', 'Yard', 'Mile']
+            },
+            weight: {
+                units: ['mg', 'g', 'kg', 'oz', 'lb'],
+                labels: ['Milligram', 'Gram', 'Kilogram', 'Ounce', 'Pound']
+            },
+            volume: {
+                units: ['ml', 'l', 'gal', 'qt', 'pt', 'cup', 'fl_oz'],
+                labels: ['Milliliter', 'Liter', 'Gallon', 'Quart', 'Pint', 'Cup', 'Fluid Ounce']
+            },
+            temperature: {
+                units: ['C', 'F', 'K'],
+                labels: ['Celsius', 'Fahrenheit', 'Kelvin']
+            }
+        };
+
+        let currentCategory = 'length';
+
+        function updateUnitSelects() {
+            const data = unitData[currentCategory];
+            const fromSelect = document.getElementById('from_unit');
+            const toSelect = document.getElementById('to_unit');
+
+            fromSelect.innerHTML = '';
+            toSelect.innerHTML = '';
+
+            data.units.forEach((unit, index) => {
+                const option1 = document.createElement('option');
+                option1.value = unit;
+                option1.textContent = data.labels[index];
+
+                const option2 = document.createElement('option');
+                option2.value = unit;
+                option2.textContent = data.labels[index];
+
+                fromSelect.appendChild(option1);
+                toSelect.appendChild(option2);
+            });
+
+            if (data.units.length > 1) {
+                toSelect.selectedIndex = 1;
+            }
+
+            hideResults();
+        }
+
+        function hideResults() {
+            document.getElementById('result-container').classList.add('hidden');
+            document.getElementById('error-container').classList.add('hidden');
+        }
+
+        async function convert() {
+            const value = document.getElementById('value').value;
+            const from_unit = document.getElementById('from_unit').value;
+            const to_unit = document.getElementById('to_unit').value;
+
+            if (!value) {
+                showError('Please enter a value');
+                return;
+            }
+
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        value: parseFloat(value),
+                        from_unit: from_unit,
+                        to_unit: to_unit,
+                        category: currentCategory
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResult(data.result, to_unit);
+                } else {
+                    showError(data.error || 'Conversion failed');
+                }
+            } catch (error) {
+                showError('An error occurred: ' + error.message);
+            }
+        }
+
+        function showResult(result, unit) {
+            document.getElementById('result').textContent = result;
+            document.getElementById('result-unit').textContent = unit.toUpperCase();
+            document.getElementById('result-container').classList.remove('hidden');
+            document.getElementById('error-container').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-container').classList.remove('hidden');
+            document.getElementById('result-container').classList.add('hidden');
+        }
+
+        function swapUnits() {
+            const fromSelect = document.getElementById('from_unit');
+            const toSelect = document.getElementById('to_unit');
+            const temp = fromSelect.value;
+            fromSelect.value = toSelect.value;
+            toSelect.value = temp;
+        }
+
+        // Event listeners
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentCategory = this.dataset.category;
+                updateUnitSelects();
+            });
+        });
+
+        document.getElementById('convert-btn').addEventListener('click', convert);
+        document.getElementById('value').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') convert();
+        });
+
+        document.getElementById('swap-units').addEventListener('click', swapUnits);
+
+        // Initialize
+        updateUnitSelects();
+    </script>
+</body>
+</html>
